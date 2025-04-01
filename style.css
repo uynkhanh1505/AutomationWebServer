@@ -1,7 +1,530 @@
-
-.icon-lightbulb {
-    color: gray; /* Mặc định là màu xám khi tắt */
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
 }
-.icon-lightbulb .on {
-    color: yellow; /* Màu vàng khi bật */
+
+.title {
+    text-align: center;
+    font-size: 35px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.container {
+    width: 100%;
+    display: flex;
+    /* gap: 30%; */
+}
+
+/* Bảng điều khiển bên trái */
+.control-panel {
+    margin-right: 40px;
+    margin-left: 40px;
+    width: 25%;
+    height: 400px; /* Tăng từ 300px lên 400px để chứa 6 cảm biến */
+    border: 2px solid #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 10px;
+    background-color: #fff;
+}
+
+.sensor {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    border: 1px solid #ccc;
+}
+
+.sensor label {
+    font-size: 14px;
+}
+
+.sensor .status {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #ccc;
+}
+
+.sensor .status.on {
+    background-color: #28a745;
+}
+
+/* Sơ đồ khối bên phải */
+.block-diagram {
+    position: relative;
+    width: 70%;
+    height: 300px;
+}
+
+.block {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    /* border: 2px solid #000; */
+    /* background-color: #fff; */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+}
+
+.block-1 { top: 0; left: 0; }
+.block-2 { top: 0; right: 10%; }
+.block-3 { bottom: 0; left: 0; }
+.block-4 { bottom: 0; right: 0; }
+
+/* Mũi tên */
+.arrow {
+    position: absolute;
+    border: 2px solid #000;
+}
+
+/* .arrow-right {
+    width: 450px;
+    height: 0;
+    top: 40px;
+    left: 80px;
+}
+
+.arrow-right::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: -5px;
+    border-left: 10px solid #000;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+} */
+
+/* Thanh progress bar
+.progress-bar {
+    position: absolute;
+    top: 85px;
+    left: 80px;
+    width: 70%;
+    height: 10px;
+    /* background-color: #555; Màu nền tối
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.progress {
+    width: 50%; /* Mức độ tiến trình, có thể thay đổi 
+    height: 100%;
+    background-color: #76c893; /* Màu progress sáng hơn 
+    transition: width 0.3s ease-in-out;
+} */
+
+/* Băng chuyền */
+.conveyor-belt {
+    position: absolute;
+    top: 85px;
+    left: 80px;
+    width: 68%;
+    height: 35px;
+    background-color: #143904; /* Màu nền băng chuyền */
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* Animation cho băng chuyền */
+@keyframes moveConveyor {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.conveyor-items {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    animation: moveConveyor 10s linear infinite; /* Animation để băng chuyền chạy */
+    animation-play-state: paused; /* Dừng animation ban đầu */
+}
+
+.item {
+    font-size: 30px;
+    color: #76c893; /* Màu của vật thể trên băng chuyền */
+    margin: 0 50px; /* Khoảng cách giữa các vật thể */
+}
+
+.arrow-down {
+    width: 0;
+    height: 100px;
+    top: 80px;
+    right: 40px;
+}
+
+.arrow-down::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: -5px;
+    border-top: 10px solid #000;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+}
+
+.arrow-left {
+    width: 100px;
+    height: 0;
+    bottom: 40px;
+    right: 80px;
+}
+
+.arrow-left::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: -5px;
+    border-right: 10px solid #000;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+}
+
+.statusProgress {
+    font-weight: bold;
+    align-items: center;
+    align-content: center;
+    /* position: absolute; */
+    /* top: 70%; */
+    /* left: 50%; */
+    /* transform: translateX(-50%); */
+    text-align: center;
+    width: 100%;
+    font-size: 35px;
+}
+
+.statusProgress p {
+    margin: 0; /* Loại bỏ margin mặc định của thẻ <p> */
+    margin-top: 10px;
+    font-weight: lighter;
+    font-size: 24px;
+}
+
+.fa-filter{
+    font-size: 50px;
+    
+}
+
+.fa-ellipsis-vertical{
+    position: absolute;
+    top: 75px;
+    font-size: 35px;
+}
+
+.fa-jar{
+    font-size: 40px;
+    position: absolute;
+    top: 120px;
+}
+
+/* Khối 2 */
+.fa-t{
+    font-size: 50px;
+    
+}
+
+.fa-download{
+    position: absolute;
+    top: 53px;
+    font-size: 30px;
+}
+
+#jar1{
+    position: absolute;
+    top: 41px;
+    right: -28px;
+}
+
+.fa-minus{
+    font-size: 45px;
+    position: absolute;
+    top: 56px;
+}
+
+#jar2{
+    position: absolute;
+    top: 77px;
+}
+
+/* Băng chuyền từ block-2 đến block-4 (dọc, trên xuống dưới) */
+.conveyor-belt-down {
+    position: absolute;
+    top: 143px;
+    right: 19%;
+    width: 35px;
+    height: 120px;
+    background-color: #143904;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.conveyor-items-down {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 0;
+    left: 0;
+    animation: moveConveyorDown 10s linear infinite;
+    animation-play-state: paused; /* Dừng animation ban đầu */
+}
+
+.conveyor-items-down .item {
+    margin: 20px 0px 20px 7px /* Khoảng cách giữa các vật thể theo chiều dọc */
+}
+
+@keyframes moveConveyorDown {
+    0% {
+        transform: translateY(-100%);
+    }
+    100% {
+        transform: translateY(100%);
+    }
+}
+
+/* Băng chuyền từ block-4 đến block-3 (ngang, phải sang trái) */
+.conveyor-belt-left {
+    position: absolute;
+    bottom: 40px;
+    left: 80px;
+    width: 69%;
+    height: 35px;
+    background-color: #143904;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.conveyor-items-left {
+    display: flex;
+    position: absolute;
+    top: 0;
+    right: 0;
+    animation: moveConveyorLeft 10s linear infinite;
+    animation-play-state: paused; /* Dừng animation ban đầu */
+}
+
+.conveyor-items-left .item {
+    margin: 0 50px;
+}
+
+@keyframes moveConveyorLeft {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Khối 4 */
+.fa-code-compare{
+    left: -80px;
+    position: absolute;
+    top: 24px;
+    font-size: 35px;
+}
+
+/* Khối 3 */
+.fa-box{
+    font-size: 60px;
+    position: absolute;
+    top: -5px;
+}
+
+
+#robotArm{
+    position: absolute;
+    left: -96px;
+}
+
+/* // control panel */
+.button-group {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+.button-group button {
+    padding: 5px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    border-radius: 3px;
+}
+
+.button-group button:hover {
+    background-color: #e0e0e0;
+}
+
+/* hover ra info */
+/* Tooltip chung */
+.tooltip {
+    position: absolute;
+    background-color: #333;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    white-space: nowrap;
+    visibility: hidden; /* Ẩn mặc định */
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 10; /* Đảm bảo tooltip nằm trên các phần tử khác */
+}
+
+/* Hiển thị tooltip khi hover vào block */
+.block:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Định vị tooltip cho từng block */
+.block-1 .tooltip {
+    top: -30px; /* Hiển thị phía trên block 1 */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.block-2 .tooltip {
+    top: -30px; /* Hiển thị phía trên block 2 */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.block-3 .tooltip {
+    bottom: -30px; /* Hiển thị phía dưới block 3 */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.block-4 .tooltip {
+    bottom: -30px; /* Hiển thị phía dưới block 4 */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* Hiển thị tooltip khi hover vào băng chuyền */
+.conveyor-belt:hover .tooltip,
+.conveyor-belt-down:hover .tooltip,
+.conveyor-belt-left:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Định vị tooltip cho từng băng chuyền */
+.conveyor-belt .tooltip {
+    top: -30px; /* Hiển thị phía trên băng chuyền ngang (block-1 đến block-2) */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.conveyor-belt-down .tooltip {
+    top: 50%; /* Hiển thị ở giữa băng chuyền dọc (block-2 đến block-4) */
+    left: -150px; /* Đẩy sang trái để không che băng chuyền */
+    transform: translateY(-50%);
+}
+
+.conveyor-belt-left .tooltip {
+    bottom: -30px; /* Hiển thị phía dưới băng chuyền ngang (block-4 đến block-3) */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* Hình tròn */
+.fa-circle-radiation{
+    right: 183px;
+    font-size: 60px;
+    position: fixed;
+    top: 223px;
+}
+
+/* Ghi đè animation xoay chậm hơn khi có lớp fa-pulse */
+.fa-circle-radiation.fa-spin-pulse {
+    animation: spin 10s linear infinite; /* 3s là thời gian xoay chậm hơn, bạn có thể điều chỉnh */
+}
+
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* Login */
+.login-modal {
+    display: flex; /* Shown by default */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.login-modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 300px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+.login-modal-content input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.login-modal-content button {
+    width: 100%;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.login-modal-content button:hover {
+    background-color: #45a049;
+}
+
+/* Hide content by default */
+.main-content {
+    display: none;
+    width: 100%;
+}
+
+.logout-btn{
+    position: absolute;
+    right: 0px;
+    top: 0px;
 }
