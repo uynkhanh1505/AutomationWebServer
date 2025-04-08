@@ -21,45 +21,21 @@
         </div>
     </div>
 
+    <!-- Modal Nhập Khối Lượng -->
+<div id="inputModal" class="login-modal" style="display: none;">
+    <div class="login-modal-content">
+        <form onsubmit="handleInput(event)">
+            <h2>Nhập Khối Lượng</h2>
+            <input type="number" id="quantity" placeholder="Khối lượng (gram)" required>
+            <button type="submit">RUN</button>
+        </form>
+    </div>
+</div>
+
     <div id="mainContent" class="main-content">
         <div class="title">FX5U WEBSERVER</div>
 
         <div class="container">
-            <!-- Bảng điều khiển bên trái -->
-            <div class="control-panel">
-                <div class="sensor">
-                    <label>Cảm biến 1</label>
-                    <div class="status on"></div>
-                </div>
-                <div class="sensor">
-                    <label>Cảm biến 2</label>
-                    <div class="status"></div>
-                </div>
-                <div class="sensor">
-                    <label>Cảm biến 3</label>
-                    <div class="status on"></div>
-                </div>
-                <div class="sensor">
-                    <label>Cảm biến 4</label>
-                    <div class="status"></div>
-                </div>
-                <!-- Thêm hai cảm biến mới từ index2 -->
-                <div class="sensor">
-                    <label>Cảm biến 5</label>
-                    <div class="status"></div>
-                </div>
-                <div class="sensor">
-                    <label>Cảm biến 6</label>
-                    <div class="status"></div>
-                </div>
-                <!-- Nhóm nút bấm từ index2 -->
-                <div class="button-group">
-                    <button id="startBtn">Bắt đầu</button>
-                    <button id="stopBtn">Dừng lại</button>
-                    <button id="pauseBtn">Tạm dừng</button>
-                </div>
-            </div>
-
             <!-- Sơ đồ khối bên phải -->
             <div class="block-diagram">
                 <div class="block block-1">
@@ -67,26 +43,51 @@
                     <i class="fa-solid fa-ellipsis-vertical" id="fade"></i>
                     <i class="fa-solid fa-jar" id="beat"></i>
                     <i class="fa-solid fa-jar" id="jar1"></i>
+                    <div class="sensor sensor-left">
+                        <label>Cảm biến 1</label>
+                        <div class="status on"></div>
+                    </div>
                     <span class="tooltip">Quá trình chiết hạt</span>
                 </div>
                 <div class="block block-2">
                     <i class="fa-solid fa-t"></i>
                     <i class="fa-solid fa-download" id="flip"></i>
                     <i class="fa-solid fa-jar" id="jar2"></i>
+                    <div class="sensor sensor-right" id="sensor2">
+                        <label>Cảm biến 2</label>
+                        <div class="status"></div>
+                    </div>
+                    <div class="sensor sensor-right" style="top: 66px;">
+                        <label>Cảm biến 3</label>
+                        <div class="status on"></div>
+                    </div>
                     <span class="tooltip">Quá trình đóng nắp</span>
                 </div>
                 <div class="block block-3">
                     <i class="fa-solid fa-box" id="fade2"></i>
+                    <div class="sensor sensor-left" id="sensor5">
+                        <label>Cảm biến 5</label>
+                        <div class="status"></div>
+                    </div>
                     <span class="tooltip">Quá trình đóng hộp</span>
                 </div>
                 <div class="block block-4">
                     <canvas id="robotArm" width="80" height="80"></canvas>
+                    <div class="sensor sensor-right" id="sensor4">
+                        <label>Cảm biến 4</label>
+                        <div class="status"></div>
+                    </div>
                     <span class="tooltip">Quá trình gắp hũ</span>
                 </div>
 
                 <!-- Băng chuyền từ index2 -->
                 <div class="conveyor-belt">
                     <div class="conveyor-items">
+                        <i class="fa-solid fa-arrow-right item"></i>
+                        <i class="fa-solid fa-arrow-right item"></i>
+                        <i class="fa-solid fa-arrow-right item"></i>
+                        <i class="fa-solid fa-arrow-right item"></i>
+                        <i class="fa-solid fa-arrow-right item"></i>
                         <i class="fa-solid fa-arrow-right item"></i>
                         <i class="fa-solid fa-arrow-right item"></i>
                         <i class="fa-solid fa-arrow-right item"></i>
@@ -105,6 +106,11 @@
                         <i class="fa-solid fa-arrow-down item"></i>
                         <i class="fa-solid fa-arrow-down item"></i>
                         <i class="fa-solid fa-arrow-down item"></i>
+                        <i class="fa-solid fa-arrow-down item"></i>
+                        <i class="fa-solid fa-arrow-down item"></i>
+                        <i class="fa-solid fa-arrow-down item"></i>
+                        <i class="fa-solid fa-arrow-down item"></i>
+                        <i class="fa-solid fa-arrow-down item"></i>
                     </div>
                     <span class="tooltip">Băng chuyền vận chuyển hũ</span>
                 </div>
@@ -117,18 +123,30 @@
                         <i class="fa-solid fa-arrow-left item"></i>
                         <i class="fa-solid fa-arrow-left item"></i>
                         <i class="fa-solid fa-arrow-left item"></i>
+                        <i class="fa-solid fa-arrow-left item"></i>
+                        <i class="fa-solid fa-arrow-left item"></i>
+                        <i class="fa-solid fa-arrow-left item"></i>
+                        <i class="fa-solid fa-arrow-left item"></i>
+                        <i class="fa-solid fa-arrow-left item"></i>
                     </div>
                     <span class="tooltip">Băng chuyền vận chuyển hũ</span>
                 </div>
             </div>
         </div>
 
-        <div class="statusProgress">Trạng thái:
-            <p>Đang chiết hạt</p>
+        <div class="button-group">
+            <button id="startBtn">Bắt đầu</button>
+            <button id="stopBtn">Dừng lại</button>
+            <button id="pauseBtn">Tạm dừng</button>
+        </div>
+
+        <div class="statusProgress">
+            <p>Trạng thái hũ 1: <span id="statusJar1">Chờ</span></p>
+            <p id="quantityProgressJar1">Khối lượng hũ 1: 0 gram (0%)</p>
+            <p>Trạng thái hũ 2: <span id="statusJar2">Chờ</span></p>
+            <p id="quantityProgressJar2">Khối lượng hũ 2: 0 gram (0%)</p>
         </div>
         <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
-
-
 </body>
 </html>
