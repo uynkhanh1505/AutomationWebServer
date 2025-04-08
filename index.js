@@ -1,320 +1,451 @@
-function turnOn() {
-    fetch('http://192.168.1.100/cgi-bin/write?address=Y0&value=1')
-        .then(response => response.text())
-        .then(data => {
-            console.log(data);
-            document.getElementById("status").innerText = "Bật";
-        });
-}
-
-function turnOff() {
-    fetch('http://192.168.1.100/cgi-bin/write?address=Y0&value=0')
-        .then(response => response.text())
-        .then(data => {
-            console.log(data);
-            document.getElementById("status").innerText = "Tắt";
-        });
-}
-
-(function(){function c(){var b=a.contentDocument||a.contentWindow.document;
-    if(b){var d=b.createElement('script');
-        d.innerHTML="window.__CF$cv$params={r:'9235b4494b261867',t:'MTc0MjQ3ODg5NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};
-        document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();
-
-
-
-// Lấy tham chiếu đến canvas và context
-document.addEventListener('DOMContentLoaded', function () {
-const canvas = document.getElementById('robotArm');
-
-// Trạng thái ban đầu: tất cả cảm biến tắt
-const sensors = document.querySelectorAll('.sensor .status');
-sensors.forEach(sensor => sensor.classList.remove('on'));
-
-// Trạng thái ban đầu: dừng tất cả animation
-const conveyors = document.querySelectorAll('.conveyor-items, .conveyor-items-down, .conveyor-items-left');
-conveyors.forEach(conveyor => conveyor.style.animationPlayState = 'paused');
-
-// Dừng animation của tay robot (block 4) ban đầu
+// Khai báo các biến toàn cục
+let currentStep = 0;
+let remainingTime = 0;
+let isPaused = false;
+let processInterval = null;
 let isRobotArmRunning = false;
-let armAnimationFrame;
+let startBtn;
+let stopBtn;
+let pauseBtn;
+let statusProgress;
+let quantityProgress;
+let conveyors;
+let startFade;
+let startBeat;
+let startFlip;
+let startPulse;
+let startFade2;
+let sensors;
+let isLoggedIn = false;
+let targetQuantity = 0;
+let currentQuantity = 0;
+let quantityInterval = null;
+let currentStepJar1 = 0;
+let currentStepJar2 = -1; // Hũ 2 bắt đầu chậm hơn hũ 1
+let currentQuantityJar1 = 0;
+let currentQuantityJar2 = 0;
+let quantityIntervalJar1 = null;
+let quantityIntervalJar2 = null;
+let statusJar1, statusJar2, quantityProgressJar1, quantityProgressJar2;
 
+// Định nghĩa các hàm toàn cục
+function showInputModal() {
+    const inputModal = document.getElementById("inputModal");
+    if (inputModal) {
+        inputModal.style.display = "flex";
+    } else {
+        console.error("Không tìm thấy inputModal");
+    }
+}
 
-// vẽ tay
-if (canvas) {
-    const ctx = canvas.getContext('2d');
+function hideInputModal() {
+    const inputModal = document.getElementById("inputModal");
+    if (inputModal) {
+        inputModal.style.display = "none";
+    } else {
+        console.error("Không tìm thấy inputModal");
+    }
+}
 
-    // Biến để điều khiển chuyển động tay gắp
-    let armAngle = 0; // Góc mở của tay gắp
-    let armSpeed = 0.01; // Tốc độ chuyển động (radian mỗi khung hình)
-    let armDirection = 1; // Hướng chuyển động (1: mở, -1: đóng)
+// Cập nhật stopProcess
+function stopProcess() {
+    if (processInterval) clearTimeout(processInterval);
+    if (quantityIntervalJar1) clearInterval(quantityIntervalJar1);
+    if (quantityIntervalJar2) clearInterval(quantityIntervalJar2);
+    sensors.forEach(sensor => sensor && sensor.classList.remove('on'));
+    conveyors.forEach(conveyor => conveyor.style.animationPlayState = 'paused');
+    isRobotArmRunning = false;
+    statusJar1.textContent = 'Đã dừng';
+    statusJar2.textContent = 'Đã dừng';
+    quantityProgressJar1.textContent = 'Khối lượng hũ 1: 0 gram (0%)';
+    quantityProgressJar2.textContent = 'Khối lượng hũ 2: 0 gram (0%)';
+    currentQuantityJar1 = 0;
+    currentQuantityJar2 = 0;
+    currentStepJar1 = 0;
+    currentStepJar2 = -1;
+    remainingTime = 0;
+    isPaused = false;
+    startBtn.textContent = 'Bắt đầu';
+}
 
-    // Hàm vẽ biểu tượng robot gắp
-    function drawRobotGripper() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Hàm cập nhật khối lượng cho từng hũ
+function updateQuantityProgress(jarNumber) {
+    const current = jarNumber === 1 ? currentQuantityJar1 : currentQuantityJar2;
+    const quantityProgress = jarNumber === 1 ? quantityProgressJar1 : quantityProgressJar2;
+    const interval = jarNumber === 1 ? quantityIntervalJar1 : quantityIntervalJar2;
 
-        // Sử dụng toàn bộ kích thước canvas 80x80px
-        const centerX = canvas.width / 2; // 40px (giữa 80px)
-        const baseY = 5; // Điểm bắt đầu từ trên xuống (cách đỉnh 5px)
-        const gripperHeight = 70; // Chiều cao tổng = 70px
-        const gripperWidth = 70; // Chiều rộng tổng = 70px
+    if (targetQuantity <= 0) {
+        quantityProgress.textContent = `Khối lượng hũ ${jarNumber}: 0 gram (0%)`;
+        clearInterval(interval);
+        return;
+    }
 
-        // Thiết lập màu và độ dày
-        ctx.fillStyle = '#000'; // Màu đen cho robot
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
+    if (current < targetQuantity) {
+        const increment = Math.random() * 1.2 + 3;
+        const newQuantity = Math.min(current + increment, targetQuantity);
+        const percentage = Math.round((newQuantity / targetQuantity) * 100);
+        quantityProgress.textContent = `Khối lượng hũ ${jarNumber}: ${newQuantity.toFixed(1)} gram (${percentage}%)`;
+        if (jarNumber === 1) currentQuantityJar1 = newQuantity;
+        else currentQuantityJar2 = newQuantity;
 
-        // 1. Vẽ phần thân trên (hình chữ nhật nhỏ với đầu bo tròn)
-        const topHeight = gripperHeight * 0.35; // 15% chiều cao
-        const topWidth = gripperWidth * 0.2; // 20% chiều rộng
-        ctx.beginPath();
-        ctx.roundRect(centerX - topWidth / 2, baseY, topWidth, topHeight, 3);
-        ctx.fill();
-
-        // 2. Vẽ phần thân giữa (hình chữ nhật lớn hơn)
-        const middleHeight = gripperHeight * 0.3; // 30% chiều cao
-        const middleWidth = gripperWidth * 0.6; // 60% chiều rộng
-        ctx.beginPath();
-        ctx.roundRect(centerX - middleWidth / 2, baseY + topHeight, middleWidth, middleHeight, 3);
-        ctx.fill();
-
-        // 3. Vẽ vòng tròn trắng ở giữa (camera/cảm biến)
-        const circleRadius = middleWidth * 0.25; // Bán kính vòng tròn
-        ctx.fillStyle = '#fff'; // Màu trắng
-        ctx.beginPath();
-        ctx.arc(centerX, baseY + topHeight + middleHeight / 2, circleRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#000';
-        ctx.stroke(); // Viền đen cho vòng tròn
-
-        // 4. Vẽ hai tay gắp (hình chữ nhật cong, với chuyển động)
-        const armHeight = gripperHeight * 0.35; // 55% chiều cao
-        const armWidth = gripperWidth * 0.15; // 15% chiều rộng mỗi tay
-        const armCurve = 10; // Độ cong của tay
-        const maxAngle = 0.3; // Góc mở tối đa (radian)
-
-        // Cập nhật góc tay gắp
-        armAngle += armSpeed * armDirection;
-        if (armAngle > maxAngle) {
-            armAngle = maxAngle;
-            armDirection = -1; // Đổi hướng: đóng tay gắp
-        } else if (armAngle < 0) {
-            armAngle = 0;
-            armDirection = 1; // Đổi hướng: mở tay gắp
+        // Khi đạt 100%, sau 2 giây chuyển sang bước tiếp theo
+        if (newQuantity >= targetQuantity) {
+            clearInterval(interval); // Dừng tăng khối lượng
+            quantityProgress.textContent = `Khối lượng hũ ${jarNumber}: ${targetQuantity} gram (100%)`;
+            setTimeout(() => {
+                const nextStep = jarNumber === 1 ? currentStepJar1 + 0.5 : currentStepJar2 + 0.5;
+                if (jarNumber === 1) currentStepJar1 = nextStep;
+                else currentStepJar2 = nextStep;
+                runStep(jarNumber, nextStep, 5000); // Chuyển sang bước tiếp theo sau 2 giây
+            }, 2000); // Chờ 2 giây
         }
-
-        // Tay trái
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.moveTo(centerX - middleWidth / 2, baseY + topHeight + middleHeight); // Điểm bắt đầu tay trái
-        ctx.lineTo(centerX - middleWidth / 2, baseY + topHeight + middleHeight + armHeight - armCurve);
-        ctx.quadraticCurveTo(
-            centerX - middleWidth / 2 - armAngle * 10, baseY + topHeight + middleHeight + armHeight, // Điểm điều khiển (thay đổi theo góc)
-            centerX - middleWidth / 2 + armWidth + armAngle * 10, baseY + topHeight + middleHeight + armHeight // Điểm kết thúc (thay đổi theo góc)
-        );
-        ctx.lineTo(centerX - middleWidth / 2 + armWidth, baseY + topHeight + middleHeight);
-        ctx.closePath();
-        ctx.fill();
-
-        // Tay phải
-        ctx.beginPath();
-        ctx.moveTo(centerX + middleWidth / 2, baseY + topHeight + middleHeight); // Điểm bắt đầu tay phải
-        ctx.lineTo(centerX + middleWidth / 2, baseY + topHeight + middleHeight + armHeight - armCurve);
-        ctx.quadraticCurveTo(
-            centerX + middleWidth / 2 + armAngle * 10, baseY + topHeight + middleHeight + armHeight, // Điểm điều khiển (thay đổi theo góc)
-            centerX + middleWidth / 2 - armWidth - armAngle * 10, baseY + topHeight + middleHeight + armHeight // Điểm kết thúc (thay đổi theo góc)
-        );
-        ctx.lineTo(centerX + middleWidth / 2 - armWidth, baseY + topHeight + middleHeight);
-        ctx.closePath();
-        ctx.fill();
     }
+}
 
-    // Hàm animate để vẽ lại liên tục
-    function animate() {
-        drawRobotGripper();
-        requestAnimationFrame(animate);
+// Hàm bắt đầu tăng khối lượng cho từng hũ
+function startQuantityProgress(jarNumber) {
+    const quantityProgress = jarNumber === 1 ? quantityProgressJar1 : quantityProgressJar2;
+    if (jarNumber === 1) {
+        currentQuantityJar1 = 0;
+        quantityIntervalJar1 = setInterval(() => updateQuantityProgress(1), 100);
+    } else {
+        currentQuantityJar2 = 0;
+        quantityIntervalJar2 = setInterval(() => updateQuantityProgress(2), 100);
     }
+    quantityProgress.textContent = `Khối lượng hũ ${jarNumber}: 0 gram (0%)`;
+}
 
+// Hàm chạy bước cho từng hũ
+function runStep(jarNumber, step, time) {
+    const status = jarNumber === 1 ? statusJar1 : statusJar2;
 
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const sensors = document.querySelectorAll('.sensor .status');
-    sensors.forEach(sensor => sensor.classList.remove('on'));
-    const statusProgress = document.querySelector('.statusProgress p');
-    const conveyors = document.querySelectorAll('.conveyor-items, .conveyor-items-down, .conveyor-items-left');
-    const startFade = document.getElementById('fade');
-    const startBeat = document.getElementById('beat');
-    const startFlip = document.getElementById('flip');
-    const startPulse = document.getElementById('pulse')
-    const startFade2 = document.getElementById('fade2');
-    let isRobotArmRunning = false;
-    let processInterval;
-    let currentStep = 0; // Theo dõi bước hiện tại
-    let remainingTime = 0; // Thời gian còn lại của bước hiện tại
-    let isPaused = false; // Trạng thái tạm dừng
+    if (step === 0) {
+        sensors[0].classList.add('on');
+        status.textContent = 'Đang chiết hạt';
+        conveyors[0].style.animationPlayState = 'paused';
+        startBeat.classList.add('fa-beat');
+        startFade.classList.add('fa-fade');
+        startQuantityProgress(jarNumber);
+    } else if (step === 0.5) {
+        sensors[0].classList.remove('on');
+        status.textContent = 'Di chuyển hũ từ 1 sang 2';
+        conveyors[0].style.animationPlayState = 'running';
+        startBeat.classList.remove('fa-beat');
+        startFade.classList.remove('fa-fade');
+        // Reset animation để đảm bảo chạy lại từ đầu
+        conveyors[0].style.animation = 'none';
+        setTimeout(() => conveyors[0].style.animation = 'moveConveyor 9s linear infinite', 10);
+    } else if (step === 1) {
+        status.textContent = 'Đang đóng nắp';
+        conveyors[0].style.animationPlayState = 'paused';
+        conveyors[0].classList.add('centered');
+        conveyors[1].style.animationPlayState = 'paused';
+        clearInterval(jarNumber === 1 ? quantityIntervalJar1 : quantityIntervalJar2);
+        (jarNumber === 1 ? quantityProgressJar1 : quantityProgressJar2).textContent = `Khối lượng hũ ${jarNumber}: ${targetQuantity} gram (100%)`;
 
-    // Hàm chạy bước cụ thể với thời gian còn lại
-    function runStep(step, time) {
-        if (step === 0) {
-            sensors[0].classList.add('on');
-            statusProgress.textContent = 'Đang chiết hạt';
-            conveyors[0].style.animationPlayState = 'running';
-            startBeat.classList.add('fa-beat');
-            startFade.classList.add('fa-fade');
-        } else if (step === 1) {
-            sensors[0].classList.remove('on');
+        startPulse.classList.add('fa-spin-pulse');
+        setTimeout(() => {
             sensors[1].classList.add('on');
-            sensors[2].classList.add('on');
-            statusProgress.textContent = 'Đang đóng nắp';
-            conveyors[0].style.animationPlayState = 'paused';
-            conveyors[1].style.animationPlayState = 'running';
-            startBeat.classList.remove('fa-beat');
-            startFade.classList.remove('fa-fade');
-            startFlip.classList.add('fa-flip');
-            startPulse.classList.add('fa-spin-pulse');
-        } else if (step === 2) {
-            sensors[1].classList.remove('on');
-            sensors[2].classList.remove('on');
-            sensors[3].classList.add('on');
-            startFlip.classList.remove('fa-flip');
-            startPulse.classList.remove('fa-spin-pulse');
-            statusProgress.textContent = 'Đang gắp hũ';
-            conveyors[1].style.animationPlayState = 'paused';
-            conveyors[2].style.animationPlayState = 'running';
-            isRobotArmRunning = true;
-        } else if (step === 3) {
-            sensors[3].classList.remove('on');
-            sensors[4].classList.add('on');
-            statusProgress.textContent = 'Đang đóng hộp';
-            startFade2.classList.add('fa-fade') 
-            isRobotArmRunning = false;
-        } else if (step === 4) {
-            sensors[4].classList.remove('on');
-            sensors[5].classList.add('on');
-            startFade2.classList.remove('fa-fade')
-            statusProgress.textContent = 'Hoàn tất';
-            conveyors[2].style.animationPlayState = 'paused';
-            return; // Kết thúc tiến trình
-        }   
+            setTimeout(() => {
+                startPulse.classList.remove('fa-spin-removed-pulse');
+                sensors[2].classList.add('on');
+                startFlip.classList.add('fa-flip');
+                setTimeout(() => {
+                    startPulse.classList.add('fa-spin-pulse');
+                    startFlip.classList.remove('fa-flip');
+                    sensors[2].classList.remove('on');
+                    sensors[1].classList.remove('on');
+                    setTimeout(() => {
+                        if (jarNumber === 1) currentStepJar1 = 1.5;
+                        else currentStepJar2 = 1.5;
+                        runStep(jarNumber, 1.5, 2500);
+                    }, 500);
+                }, 2000);
+            }, 2000);
+        }, 2000);
+        return;
+    } else if (step === 1.5) {
+        startPulse.classList.remove('fa-spin-pulse');
+        status.textContent = 'Di chuyển hũ từ 2 sang 3';
+        conveyors[1].style.animationPlayState = 'running';
+        conveyors[1].style.animation = 'none';
+        setTimeout(() => conveyors[1].style.animation = 'moveConveyorDown 9s linear infinite', 10);
+    } else if (step === 2) {
+        sensors[4].classList.add('on');
+        status.textContent = 'Đang gắp hũ';
+        conveyors[1].style.animationPlayState = 'paused';
+        conveyors[1].classList.add('centered');
+        conveyors[2].style.animationPlayState = 'paused';
+        isRobotArmRunning = true;
+    } else if (step === 2.5) {
+        sensors[4].classList.remove('on');
+        status.textContent = 'Di chuyển hũ từ 3 sang 4';
+        conveyors[2].style.animationPlayState = 'running';
+        conveyors[2].style.animation = 'none';
+        setTimeout(() => conveyors[2].style.animation = 'moveConveyorLeft 9s linear infinite', 10);
+        isRobotArmRunning = false;
+    } else if (step === 3) {
+        sensors[3].classList.add('on');
+        status.textContent = 'Đang đóng hộp';
+        conveyors[2].style.animationPlayState = 'paused';
+        conveyors[2].classList.add('centered');
+        startFade2.classList.add('fa-fade');
+    } else if (step === 4) {
+        sensors[3].classList.remove('on');
+        status.textContent = 'Hoàn tất';
+        startFade2.classList.remove('fa-fade');
+        conveyors[2].style.animationPlayState = 'paused';
+        return;
+    }
 
-        if (time > 0) {
-            processInterval = setTimeout(() => {
-                if (!isPaused) {
-                    currentStep++;
-                    runStep(currentStep, 5000);
+    if (time > 0 && step !== 1) {
+        processInterval = setTimeout(() => {
+            if (!isPaused) {
+                const nextStep = step === 0 ? 0.5 : step === 0.5 ? 1 : step === 1.5 ? 2 : step === 2 ? 2.5 : step === 2.5 ? 3 : step + 1;
+                if (jarNumber === 1) currentStepJar1 = nextStep;
+                else currentStepJar2 = nextStep;
+                // Tăng thời gian cho các bước trung gian từ 2500ms lên 5000ms
+                runStep(jarNumber, nextStep, nextStep === 0.5 || nextStep === 1.5 || nextStep === 2.5 ? 5000 : 5000);
+
+                // Kích hoạt hũ 2 khi hũ 1 hoàn thành bước 0
+                if (jarNumber === 1 && step === 0 && currentStepJar2 === -1) {
+                    currentStepJar2 = 0;
+                    runStep(2, 0, 10000);
                 }
-            }, time);
-        }
+            }
+        }, time);
     }
+}
 
-    // Hàm khởi động quá trình từ đầu
-    function startProcess() {
-        stopProcess();
-        currentStep = 0;
-        remainingTime = 5000;
-        startBtn.textContent = 'Bắt đầu'; // Đặt lại nhãn nút
-        isPaused = false;
-        runStep(currentStep, remainingTime);
+// Cập nhật startProcessWithQuantity
+function startProcessWithQuantity(quantity) {
+    stopProcess();
+    targetQuantity = quantity; // Khối lượng chung cho cả hai hũ
+    currentStepJar1 = 0;
+    currentStepJar2 = -1; // Hũ 2 chưa bắt đầu
+    remainingTime = 10000;
+    startBtn.textContent = "Bắt đầu";
+    isPaused = false;
+    runStep(1, currentStepJar1, remainingTime);
+}
+
+function handleInput(event) {
+    if (!event) {
+        console.error("Event không được truyền vào handleInput");
+        return;
     }
-
-    // Hàm tiếp tục quá trình từ điểm dừng
-    function resumeProcess() {
-        if (isPaused) {
-            isPaused = false;
-            startBtn.textContent = 'Bắt đầu'; // Đặt lại nhãn nút sau khi tiếp tục
-            runStep(currentStep, remainingTime); // Tiếp tục từ bước hiện tại với thời gian còn lại
-        }
+    event.preventDefault();
+    const quantityInput = document.getElementById("quantity");
+    if (!quantityInput) {
+        console.error("Không tìm thấy input quantity");
+        return;
     }
+    const quantity = parseFloat(quantityInput.value);
+    console.log("Giá trị nhập từ input:", quantity);
+    if (!isNaN(quantity) && quantity > 0) {
+        hideInputModal();
+        startProcessWithQuantity(quantity);
+    } else {
+        alert("Vui lòng nhập khối lượng hợp lệ.");
+        console.error("Giá trị quantity không hợp lệ:", quantity);
+    }
+}
 
-    // Hàm dừng toàn bộ quá trình
-    function stopProcess() {
-        clearTimeout(processInterval);
-        sensors.forEach(sensor => sensor.classList.remove('on'));
+// Cập nhật pauseProcess và resumeProcess
+function pauseProcess() {
+    if (!isPaused && (currentStepJar1 < 4 || currentStepJar2 < 4)) {
+        if (processInterval) clearTimeout(processInterval);
+        if (quantityIntervalJar1) clearInterval(quantityIntervalJar1);
+        if (quantityIntervalJar2) clearInterval(quantityIntervalJar2);
         conveyors.forEach(conveyor => conveyor.style.animationPlayState = 'paused');
         isRobotArmRunning = false;
-        statusProgress.textContent = 'Đã dừng';
-        currentStep = 0;
-        remainingTime = 0;
+        statusJar1.textContent = 'Tạm dừng';
+        statusJar2.textContent = 'Tạm dừng';
+        remainingTime = processInterval ? Math.max(10000 - (Date.now() - processInterval._idleStart), 0) : 0;
+        isPaused = true;
+        startBtn.textContent = 'Tiếp tục';
+    }
+}
+
+function resumeProcess() {
+    if (isPaused) {
         isPaused = false;
-        startBtn.textContent = 'Bắt đầu'; // Đặt lại nhãn nút
+        startBtn.textContent = 'Bắt đầu';
+        if (currentStepJar1 === 0) startQuantityProgress(1);
+        if (currentStepJar2 === 0) startQuantityProgress(2);
+        runStep(1, currentStepJar1, remainingTime);
+        if (currentStepJar2 >= 0) runStep(2, currentStepJar2, remainingTime);
+    }
+}
+
+function handleLogin(event) {
+    if (!event) {
+        console.error("Event không được truyền vào handleLogin");
+        return;
+    }
+    event.preventDefault();
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    if (username === "admin" && password === "admin") {
+        isLoggedIn = true;
+        document.getElementById("loginModal").style.display = "none";
+        document.getElementById("mainContent").style.display = "block";
+    } else {
+        alert("Invalid username or password");
+    }
+}
+
+function logout() {
+    isLoggedIn = false;
+    targetQuantity = 0; // Reset targetQuantity khi đăng xuất
+    document.getElementById("mainContent").style.display = "none";
+    document.getElementById("loginModal").style.display = "flex";
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (isLoggedIn) {
+        document.getElementById("loginModal").style.display = "none";
+        document.getElementById("mainContent").style.display = "block";
+    } else {
+        document.getElementById("loginModal").style.display = "flex";
+        document.getElementById("mainContent").style.display = "none";
     }
 
-    // Hàm tạm dừng
-    function pauseProcess() {
-        if (!isPaused && currentStep < 4) { // Chỉ tạm dừng nếu chưa hoàn tất
-            clearTimeout(processInterval);
-            conveyors.forEach(conveyor => conveyor.style.animationPlayState = 'paused');
-            isRobotArmRunning = false;
-            statusProgress.textContent = 'Tạm dừng';
+    const canvas = document.getElementById('robotArm');
+    startBtn = document.getElementById('startBtn');
+    stopBtn = document.getElementById('stopBtn');
+    pauseBtn = document.getElementById('pauseBtn');
+    statusProgress = document.querySelector('.statusProgress p');
+    quantityProgress = document.getElementById('quantityProgress');
+    conveyors = document.querySelectorAll('.conveyor-items, .conveyor-items-down, .conveyor-items-left');
+    startFade = document.getElementById('fade');
+    startBeat = document.getElementById('beat');
+    startFlip = document.getElementById('flip');
+    startPulse = document.getElementById('pulse');
+    startFade2 = document.getElementById('fade2');
+    statusJar1 = document.getElementById('statusJar1');
+    statusJar2 = document.getElementById('statusJar2');
+    quantityProgressJar1 = document.getElementById('quantityProgressJar1');
+    quantityProgressJar2 = document.getElementById('quantityProgressJar2');
+    sensors = [
+        document.querySelector('.block-1 .sensor .status'),
+        document.querySelector('.block-2 .sensor:nth-of-type(1) .status'),
+        document.querySelector('.block-2 .sensor:nth-of-type(2) .status'),
+        document.querySelector('.block-3 .sensor .status'),
+        document.querySelector('.block-4 .sensor .status')
+    ];
 
-            // Tính thời gian còn lại của bước hiện tại
-            const elapsedTime = Date.now() - (processInterval._idleStart || Date.now());
-            remainingTime = Math.max(10000 - elapsedTime, 0);
-
-            isPaused = true;
-            startBtn.textContent = 'Tiếp tục'; // Đổi nút thành "Tiếp tục"
-        }
+    if (!quantityProgress) {
+        console.error("Không tìm thấy phần tử quantityProgress");
+    } else {
+        console.log("quantityProgress được tìm thấy:", quantityProgress);
     }
 
-    // Gán sự kiện cho các nút
+    sensors.forEach(sensor => sensor.classList.remove('on'));
+    conveyors.forEach(conveyor => conveyor.style.animationPlayState = 'paused');
+
     startBtn.addEventListener('click', function () {
+        console.log("Nút Bắt đầu được nhấn, nội dung nút:", startBtn.textContent);
         if (startBtn.textContent === 'Bắt đầu') {
-            startProcess();
+            showInputModal();
         } else if (startBtn.textContent === 'Tiếp tục') {
             resumeProcess();
         }
     });
+
     stopBtn.addEventListener('click', stopProcess);
     pauseBtn.addEventListener('click', pauseProcess);
 
+    const inputForm = document.querySelector('#inputModal form');
+    if (inputForm) {
+        inputForm.addEventListener('submit', handleInput);
+    } else {
+        console.error("Không tìm thấy form trong inputModal");
+    }
 
-    
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        let armAngle = 0;
+        let armSpeed = 0.01;
+        let armDirection = 1;
 
+        function drawRobotGripper() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const baseY = 5;
+            const gripperHeight = 70;
+            const gripperWidth = 70;
 
-    // Bắt đầu animation
-    animate();
-} else {
-    console.error('Không tìm thấy phần tử canvas với id "robotArm"');
-}
-});
- 
-// Login
+            ctx.fillStyle = '#000';
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
 
+            const topHeight = gripperHeight * 0.35;
+            const topWidth = gripperWidth * 0.2;
+            ctx.beginPath();
+            ctx.roundRect(centerX - topWidth / 2, baseY, topWidth, topHeight, 3);
+            ctx.fill();
 
-   // // Check if user is "logged in" (using localStorage for this example)
-        // if (localStorage.getItem("isLoggedIn") === "true") {
-        //     document.getElementById("loginModal").style.display = "none";
-        //     document.getElementById("mainContent").style.display = "block";
-        // }
+            const middleHeight = gripperHeight * 0.3;
+            const middleWidth = gripperWidth * 0.6;
+            ctx.beginPath();
+            ctx.roundRect(centerX - middleWidth / 2, baseY + topHeight, middleWidth, middleHeight, 3);
+            ctx.fill();
 
-        // Use a session variable instead of localStorage (won't persist across refreshes)
-        let isLoggedIn = false;
+            const circleRadius = middleWidth * 0.25;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(centerX, baseY + topHeight + middleHeight / 2, circleRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
 
-        // On page load, always show login modal unless just logged in
-        document.getElementById("loginModal").style.display = "flex";
-        document.getElementById("mainContent").style.display = "none";
+            const armHeight = gripperHeight * 0.35;
+            const armWidth = gripperWidth * 0.15;
+            const armCurve = 10;
+            const maxAngle = 0.3;
 
-        function handleLogin(event) {
-            event.preventDefault();
-            const username = document.getElementById("username").value;
-            const password = document.getElementById("password").value;
-
-            // Simple fake authentication (replace with real logic)
-            if (username === "admin" && password === "admin") { // Example credentials
-                // localStorage.setItem("isLoggedIn", "true"); // Mark as logged in
-                isLoggedIn = true; // Set session variable
-                document.getElementById("loginModal").style.display = "none";
-                document.getElementById("mainContent").style.display = "block";
-            } else {
-                alert("Invalid username or password");
+            armAngle += armSpeed * armDirection;
+            if (armAngle > maxAngle) {
+                armAngle = maxAngle;
+                armDirection = -1;
+            } else if (armAngle < 0) {
+                armAngle = 0;
+                armDirection = 1;
             }
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.moveTo(centerX - middleWidth / 2, baseY + topHeight + middleHeight);
+            ctx.lineTo(centerX - middleWidth / 2, baseY + topHeight + middleHeight + armHeight - armCurve);
+            ctx.quadraticCurveTo(
+                centerX - middleWidth / 2 - armAngle * 10, baseY + topHeight + middleHeight + armHeight,
+                centerX - middleWidth / 2 + armWidth + armAngle * 10, baseY + topHeight + middleHeight + armHeight
+            );
+            ctx.lineTo(centerX - middleWidth / 2 + armWidth, baseY + topHeight + middleHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(centerX + middleWidth / 2, baseY + topHeight + middleHeight);
+            ctx.lineTo(centerX + middleWidth / 2, baseY + topHeight + middleHeight + armHeight - armCurve);
+            ctx.quadraticCurveTo(
+                centerX + middleWidth / 2 + armAngle * 10, baseY + topHeight + middleHeight + armHeight,
+                centerX + middleWidth / 2 - armWidth - armAngle * 10, baseY + topHeight + middleHeight + armHeight
+            );
+            ctx.lineTo(centerX + middleWidth / 2 - armWidth, baseY + topHeight + middleHeight);
+            ctx.closePath();
+            ctx.fill();
         }
 
-        // Optional: Logout function (if you want to add a logout button)
-        function logout() {
-            // localStorage.removeItem("isLoggedIn");
-            isLoggedIn = false; // Reset session variable
-            document.getElementById("mainContent").style.display = "none";
-            document.getElementById("loginModal").style.display = "flex"; // Show login modal again
+        function animate() {
+            drawRobotGripper();
+            requestAnimationFrame(animate);
         }
+
+        animate();
+    } else {
+        console.error('Không tìm thấy phần tử canvas với id "robotArm"');
+    }
+});
